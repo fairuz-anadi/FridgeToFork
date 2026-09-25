@@ -30,20 +30,18 @@ chown -R www-data:www-data storage bootstrap/cache
 php artisan config:clear || true
 php artisan storage:link --force || true
 
-echo "Waiting for the database..."
+# Retry until the database accepts connections (it may still be starting).
+echo "Running migrations..."
 tries=0
-until php artisan migrate:status >/dev/null 2>&1; do
+until php artisan migrate --force; do
   tries=$((tries + 1))
   if [ "$tries" -ge 30 ]; then
-    echo "Database not reachable; showing the last error:"
-    php artisan migrate:status || true
+    echo "Migrations failed after ${tries} attempts."
     exit 1
   fi
-  sleep 2
+  echo "Database not ready yet; retrying in 3s..."
+  sleep 3
 done
-
-echo "Running migrations..."
-php artisan migrate --force
 
 # The seeders use updateOrCreate, so re-running them is safe. It also
 # regenerates the recipe artwork, which lives on the container's disk and is
