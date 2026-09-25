@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Validation\ValidationException;
@@ -34,7 +35,7 @@ class Handler extends ExceptionHandler
 
     public function render($request, Throwable $exception)
     {
-        if (!$request->expectsJson()) {
+        if (!$request->expectsJson() && !$request->is('api/*')) {
             return parent::render($request, $exception);
         }
 
@@ -55,6 +56,12 @@ class Handler extends ExceptionHandler
             return response()->json([
                 'message' => 'Too many requests. Please try again later.',
             ], 429);
+        }
+
+        if ($exception instanceof ModelNotFoundException) {
+            return response()->json([
+                'message' => 'The requested resource was not found.',
+            ], 404);
         }
 
         if ($exception instanceof HttpExceptionInterface) {
