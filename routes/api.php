@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ChatController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\CookModeController;
 use App\Http\Controllers\CuisineController;
@@ -36,6 +37,9 @@ Route::post('contact', [ContactController::class, 'store'])->middleware('throttl
 Route::get('ingredients', [IngredientController::class, 'index']);
 Route::get('ingredients/aisles', [IngredientController::class, 'aisles']);
 Route::post('pantry/search', PantrySearchController::class);
+
+// Recipe chatbot — works signed out too; uses the fridge when signed in.
+Route::post('chat', ChatController::class)->middleware('throttle:15,1');
 
 // Cuisine Map Explorer
 Route::get('cuisines', [CuisineController::class, 'index']);

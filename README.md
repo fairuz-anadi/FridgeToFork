@@ -73,6 +73,7 @@ approachable for everyday cooks.
 | 6 | Reviews & Ratings         | Recipe library — 5-star ratings, comments, points-based leaderboard   |
 | 7 | Nutrition Insights        | Calories and macro split per serving, on every recipe                 |
 | 8 | Auto Shopping List        | `/shopping-list` — built from the planned week, minus what's in the fridge, grouped by aisle |
+| 9 | Kitchen Assistant Chatbot | "Ask the chef" button on every page — suggests recipes from what you have, by cuisine, diet or time, and explains the app. Uses Claude when `ANTHROPIC_API_KEY` is set, otherwise a built-in assistant |
 
 ### How the ingredient matching works
 
@@ -171,8 +172,8 @@ PostgreSQL instead of SQLite, uncomment the `pgsql` block in `.env`.
 php artisan test
 ```
 
-44 tests cover ingredient parsing, timer detection, pantry matching, the cuisine
-map, meal planning, shopping-list generation and nutrition. The frontend is
+48 tests cover ingredient parsing, timer detection, pantry matching, the cuisine
+map, meal planning, shopping-list generation, nutrition and the chatbot. The frontend is
 linted with `npm run lint --prefix client`.
 
 ---

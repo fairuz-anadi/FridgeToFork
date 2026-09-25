@@ -277,6 +277,14 @@ export const api = {
       { errorMessage: "We couldn't run that search right now." }
     ),
 
+  // ── Recipe chatbot ────────────────────────────────────────────────────
+  chat: (messages) =>
+    request(
+      "/chat",
+      { method: "POST", body: JSON.stringify({ messages }) },
+      { errorMessage: "The kitchen assistant couldn't answer right now." }
+    ),
+
   // ── Cuisine Map Explorer ──────────────────────────────────────────────
   cuisines: () => request("/cuisines", {}, { errorMessage: "We couldn't load the cuisine map right now." }),
   cuisine: (code) =>

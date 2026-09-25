@@ -53,4 +53,14 @@ return [
         'edamam_app_key' => env('EDAMAM_APP_KEY'),
     ],
 
+    /*
+     | The recipe chatbot uses Claude when an API key is configured and falls
+     | back to the built-in rule-based assistant otherwise.
+     */
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-5'),
+        'base_url' => env('ANTHROPIC_BASE_URL'),
+    ],
+
 ];

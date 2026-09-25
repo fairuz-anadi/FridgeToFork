@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { api, setToken } from "./api/api";
 import AuthModal from "./components/AuthModal";
+import ChatWidget from "./components/ChatWidget";
 import Footer from "./components/Footer";
 import SiteAbout from "./components/SiteAbout";
 import SiteHome from "./components/SiteHome";
@@ -185,6 +186,8 @@ function AppContent() {
         </main>
 
         <Footer />
+
+        <ChatWidget user={user} />
 
         {authMode && (
           <AuthModal

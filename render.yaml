@@ -40,6 +40,10 @@ services:
         value: log
       - key: NUTRITION_PROVIDER
         value: local
+      # Optional: enables Claude in the recipe chatbot. Without it the chatbot
+      # uses the built-in assistant. Set the value in the Render dashboard.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       - key: GOOGLE_CLIENT_ID
         value: 587227212522-eigpdur7u4l6vo5j9ltd0dnqe18m0qqn.apps.googleusercontent.com
       # Build-time value for the React client's Google sign-in button.
