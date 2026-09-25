@@ -2,6 +2,17 @@
 
 *From your fridge to your fork.*
 
+## Live demo
+
+**https://fridgetofork.onrender.com** — the React client, Laravel API and PostgreSQL
+database, deployed together on Render.
+
+Sign in as the demo cook to get a stocked fridge, a planned week, favourites and
+reviews already in place (accounts are listed under [Seeded accounts](#seeded-accounts)).
+
+> The app runs on a free Render instance, which sleeps after 15 minutes idle —
+> the first visit after that can take about a minute to load.
+
 ## Project Overview
 
 ### Objective
@@ -44,7 +55,7 @@ approachable for everyday cooks.
 | Auth             | Laravel Sanctum tokens, optional Google sign-in               |
 | Nutrition data   | Built-in per-ingredient table; optional Spoonacular/Edamam    |
 | Rendering        | Client-Side Rendering (CSR)                                   |
-| Hosting & DevOps | Docker Compose / Railway, CI/CD via GitHub Actions            |
+| Hosting & DevOps | Docker on Render (`render.yaml`), CI/CD via GitHub Actions    |
 
 ---
 
