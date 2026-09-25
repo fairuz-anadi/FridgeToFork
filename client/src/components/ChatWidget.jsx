@@ -11,6 +11,33 @@ const GREETING = {
 const SUGGESTIONS = ["I have eggs, rice and onion", "Quick vegetarian dinner", "Something Italian"];
 const HISTORY_LIMIT = 12;
 
+const SEEN_KEY = "fridgetofork_chat_seen";
+
+function ChefIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        className="chef-icon__hat"
+        d="M14 30.5c-4.3-.8-7.5-4.5-7.5-9 0-5 4.1-9.1 9.1-9.1.8 0 1.6.1 2.3.3C19.6 9.3 21.9 7.5 24 7.5s4.4 1.8 6.1 5.2c.7-.2 1.5-.3 2.3-.3 5 0 9.1 4.1 9.1 9.1 0 4.5-3.2 8.2-7.5 9V35H14z"
+      />
+      <rect className="chef-icon__band" x="14" y="36.5" width="20" height="5" rx="1.6" />
+      <path className="chef-icon__fold" d="M20 30.5v4.5M28 30.5v4.5" />
+      <path
+        className="chef-icon__spark"
+        d="M40 3.5l1.2 3.1 3.3 1.2-3.3 1.2L40 12.2l-1.2-3.2-3.3-1.2 3.3-1.2z"
+      />
+    </svg>
+  );
+}
+
+function hasSeenChat() {
+  try {
+    return localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function loadConversation() {
   try {
     const saved = JSON.parse(sessionStorage.getItem(STORAGE_KEY));
@@ -41,6 +68,7 @@ function RecipeChip({ recipe, onOpen }) {
 
 export default function ChatWidget({ user }) {
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(hasSeenChat);
   const [messages, setMessages] = useState(loadConversation);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -61,6 +89,18 @@ export default function ChatWidget({ user }) {
       inputRef.current?.focus();
     }
   }, [open, messages, sending]);
+
+  function toggle() {
+    setOpen((value) => !value);
+    if (!seen) {
+      setSeen(true);
+      try {
+        localStorage.setItem(SEEN_KEY, "1");
+      } catch {
+        // Only affects whether the launcher keeps pulsing.
+      }
+    }
+  }
 
   async function send(text) {
     const content = text.trim();
@@ -97,9 +137,15 @@ export default function ChatWidget({ user }) {
       {open && (
         <section className="chat-panel" aria-label="Kitchen assistant">
           <header className="chat-panel__head">
-            <div>
-              <strong>Kitchen assistant</strong>
-              <small>{user ? `Cooking with ${user.name}` : "Ask what you can cook"}</small>
+            <div className="chat-panel__who">
+              <span className="chat-avatar">
+                <ChefIcon className="chef-icon" />
+                <span className="chat-avatar__status" />
+              </span>
+              <div>
+                <strong>Kitchen assistant</strong>
+                <small>{user ? `Cooking with ${user.name}` : "Online · ask what you can cook"}</small>
+              </div>
             </div>
             <div className="chat-panel__actions">
               <button type="button" onClick={reset} title="Start a new chat">
@@ -165,15 +211,18 @@ export default function ChatWidget({ user }) {
         </section>
       )}
 
-      <button
-        type="button"
-        className="chat-launcher"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-label={open ? "Close kitchen assistant" : "Open kitchen assistant"}
-      >
-        {open ? "×" : "Ask the chef"}
-      </button>
+      <div className="chat-launcher-wrap">
+        {!open && <span className="chat-launcher__label">Ask the chef</span>}
+        <button
+          type="button"
+          className={`chat-launcher${seen ? "" : " is-new"}`}
+          onClick={toggle}
+          aria-expanded={open}
+          aria-label={open ? "Close kitchen assistant" : "Open kitchen assistant"}
+        >
+          {open ? <span className="chat-launcher__close">×</span> : <ChefIcon className="chef-icon chef-icon--launcher" />}
+        </button>
+      </div>
     </div>
   );
 }
