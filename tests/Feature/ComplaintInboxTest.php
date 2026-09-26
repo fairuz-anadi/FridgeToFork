@@ -78,6 +78,18 @@ class ComplaintInboxTest extends TestCase
         $this->assertSame(1, ContactSubmission::count());
     }
 
+    public function test_message_length_limits(): void
+    {
+        Mail::fake();
+        Sanctum::actingAs($this->cook());
+        $send = fn (int $length) => $this->postJson('/api/contact', ['category' => 'other', 'message' => str_repeat('a', $length)]);
+
+        $send(10)->assertCreated();
+        $send(5000)->assertCreated();
+        $send(9)->assertStatus(422)->assertJsonValidationErrors('message');
+        $send(5001)->assertStatus(422)->assertJsonValidationErrors('message');
+    }
+
     public function test_an_unknown_category_is_rejected(): void
     {
         Sanctum::actingAs($this->cook());
