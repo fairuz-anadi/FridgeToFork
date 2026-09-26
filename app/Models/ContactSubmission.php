@@ -11,7 +11,7 @@ class ContactSubmission extends Model
 
     public const CATEGORIES = ['bug', 'recipe', 'account', 'suggestion', 'other'];
 
-    public const STATUSES = ['open', 'resolved'];
+    public const STATUSES = ['open', 'resolved', 'archived'];
 
     protected $fillable = [
         'user_id',

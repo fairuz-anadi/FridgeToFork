@@ -3,6 +3,9 @@ import { api } from "../api/api";
 import { CONTACT_CATEGORIES, categoryLabel } from "../components/contactCategories";
 import { useToast } from "../components/useToast";
 
+// Archived complaints are closed from the sender's point of view.
+const STATUS_LABELS = { open: "Open", resolved: "Resolved", archived: "Closed" };
+
 function formatDate(value) {
   return value
     ? new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value))
@@ -110,7 +113,7 @@ export default function ContactPage({ user, onRequireAuth }) {
               <div className="contact-ticket__head">
                 <span className="chip">{categoryLabel(item.category)}</span>
                 <span className={`contact-status contact-status--${item.status}`}>
-                  {item.status === "resolved" ? "Resolved" : "Open"}
+                  {STATUS_LABELS[item.status] ?? "Open"}
                 </span>
                 <span className="muted">{formatDate(item.created_at)}</span>
               </div>

@@ -146,6 +146,26 @@ class ComplaintInboxTest extends TestCase
         Mail::assertSent(ContactReplyMail::class, 1);
     }
 
+    public function test_archived_complaints_are_kept_and_can_be_restored_or_deleted(): void
+    {
+        $complaint = ContactSubmission::create(['name' => 'Rina', 'email' => 'rina@example.com', 'category' => 'bug', 'message' => 'Old report.']);
+        Sanctum::actingAs($this->admin());
+
+        $this->patchJson("/api/admin/contacts/{$complaint->id}", ['status' => 'archived'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'archived');
+
+        $this->getJson('/api/admin/contacts?status=open')->assertJsonCount(0, 'data');
+        $this->getJson('/api/admin/contacts?status=archived')
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('meta.archived', 1);
+
+        $this->patchJson("/api/admin/contacts/{$complaint->id}", ['status' => 'open'])
+            ->assertJsonPath('data.status', 'open');
+        $this->deleteJson("/api/admin/contacts/{$complaint->id}")->assertOk();
+        $this->assertDatabaseMissing('contact_submissions', ['id' => $complaint->id]);
+    }
+
     public function test_the_brevo_mailer_posts_to_the_brevo_api(): void
     {
         Http::fake(['api.brevo.com/*' => Http::response(['messageId' => 'abc'], 201)]);

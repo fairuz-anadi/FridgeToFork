@@ -9,15 +9,18 @@ function formatDate(value) {
     : "";
 }
 
+const STATUS_LABELS = { open: "Open", resolved: "Resolved", archived: "Archived" };
+
 /**
  * Admin Dashboard → Contacts: every complaint, open ones first. The admin
  * replies (emailed to the sender and shown on their Contact page), resolves,
- * reopens or archives each one.
+ * reopens or archives each one. Archived complaints stay under "Archived",
+ * where they can be restored or deleted for good.
  */
 export default function ComplaintInbox({ onChanged }) {
   const [filter, setFilter] = useState("open");
   const [items, setItems] = useState(null);
-  const [meta, setMeta] = useState({ open: 0, resolved: 0 });
+  const [meta, setMeta] = useState({ open: 0, resolved: 0, archived: 0 });
   const [drafts, setDrafts] = useState({});
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -75,6 +78,7 @@ export default function ComplaintInbox({ onChanged }) {
           {[
             ["open", `Open (${meta.open})`],
             ["resolved", `Resolved (${meta.resolved})`],
+            ["archived", `Archived (${meta.archived ?? 0})`],
             ["all", "All"],
           ].map(([value, label]) => (
             <button
@@ -95,7 +99,9 @@ export default function ComplaintInbox({ onChanged }) {
         {items === null ? (
           <div className="feedback">Loading messages...</div>
         ) : items.length === 0 ? (
-          <div className="feedback">{filter === "open" ? "No open complaints. Your inbox is clear." : "Nothing here yet."}</div>
+          <div className="feedback">
+            {filter === "open" ? "No open complaints. Your inbox is clear." : filter === "archived" ? "No archived messages." : "Nothing here yet."}
+          </div>
         ) : (
           items.map((item) => (
             <article className="contact-ticket contact-ticket--admin" key={item.id}>
@@ -103,7 +109,7 @@ export default function ComplaintInbox({ onChanged }) {
                 <strong>#{item.id}</strong>
                 <span className="chip">{categoryLabel(item.category)}</span>
                 <span className={`contact-status contact-status--${item.status}`}>
-                  {item.status === "resolved" ? "Resolved" : "Open"}
+                  {STATUS_LABELS[item.status] ?? "Open"}
                 </span>
                 <span className="muted">
                   {item.name} · <a href={`mailto:${item.email}`}>{item.email}</a> · {formatDate(item.created_at)}
@@ -139,21 +145,32 @@ export default function ComplaintInbox({ onChanged }) {
                   </>
                 ) : (
                   <button className="button button--ghost" disabled={busy !== ""} onClick={() => reply(item, "open")} type="button">
-                    {(drafts[item.id] ?? "").trim() ? "Reply & reopen" : "Reopen"}
+                    {(drafts[item.id] ?? "").trim() ? "Reply & reopen" : item.status === "archived" ? "Restore" : "Reopen"}
                   </button>
                 )}
-                <button
-                  className="button button--ghost"
-                  disabled={busy !== ""}
-                  onClick={() => {
-                    if (window.confirm("Archive (delete) this message?")) {
-                      run(`delete-${item.id}`, () => api.adminDeleteContact(item.id));
-                    }
-                  }}
-                  type="button"
-                >
-                  Archive
-                </button>
+                {item.status === "archived" ? (
+                  <button
+                    className="button button--ghost"
+                    disabled={busy !== ""}
+                    onClick={() => {
+                      if (window.confirm("Delete this message permanently? This cannot be undone.")) {
+                        run(`delete-${item.id}`, () => api.adminDeleteContact(item.id));
+                      }
+                    }}
+                    type="button"
+                  >
+                    Delete permanently
+                  </button>
+                ) : (
+                  <button
+                    className="button button--ghost"
+                    disabled={busy !== ""}
+                    onClick={() => run(`archive-${item.id}`, () => api.adminUpdateContact(item.id, { status: "archived" }))}
+                    type="button"
+                  >
+                    Archive
+                  </button>
+                )}
               </div>
             </article>
           ))

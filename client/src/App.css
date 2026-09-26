@@ -3552,6 +3552,11 @@ body {
   color: #0f5132;
 }
 
+.contact-status--archived {
+  background: #e9eaec;
+  color: #4a4f55;
+}
+
 .contact-reply {
   padding: 10px 12px;
   border-left: 3px solid var(--brand);

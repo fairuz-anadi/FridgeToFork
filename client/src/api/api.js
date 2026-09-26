@@ -233,7 +233,7 @@ export const api = {
       { errorMessage: "We couldn't update this message right now." }
     ),
   adminDeleteContact: (id) =>
-    request(`/admin/contacts/${id}`, { method: "DELETE" }, { errorMessage: "We couldn't archive this message right now." }),
+    request(`/admin/contacts/${id}`, { method: "DELETE" }, { errorMessage: "We couldn't delete this message right now." }),
   sendTip: (body) =>
     request(
       "/tips",
