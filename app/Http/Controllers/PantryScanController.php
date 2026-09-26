@@ -86,8 +86,11 @@ class PantryScanController extends Controller
     {
         return "List the food ingredients you can see in this photo of someone's fridge, pantry or kitchen counter, so they can be added to a recipe app.\n\n"
             . "When an item matches one of these ingredient names, use that exact name: {$knownNames}.\n\n"
-            . 'For anything else, use a short everyday name (for example "spinach", not "a bag of baby spinach leaves"). '
-            . 'Only list items you can actually identify; skip packaging you cannot read and anything that is not food. '
+            . 'Be thorough: look at every shelf, drawer, door and container and list every distinct food you can recognise — '
+            . 'vegetables, fruit, fresh herbs, mushrooms, dairy, eggs, meat, fish, drinks and sauces. '
+            . 'List each kind once, however many pieces there are. '
+            . 'For anything not in the list, use a short everyday name (for example "spinach", not "a bag of baby spinach leaves"). '
+            . 'Use "medium" or "low" confidence when you are unsure (for example an unlabelled bottle), and skip anything that is not food. '
             . 'If the photo shows no food at all, return an empty list.';
     }
 
