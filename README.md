@@ -39,8 +39,8 @@ approachable for everyday cooks.
 | ID          | Name              | Role                                   |
 |-------------|-------------------|----------------------------------------|
 | 20230104121 | Fairuz Anadi      | Lead — back-end and deployment         |
-| 20230104123 | Easteak Ahmed     | UI/UX design                           |
-| 20220204061 | Saleh Mahmud Sami | Front-end                              |
+| 20230104123 | Easteak Ahmed     | Front-end                              |
+| 20220204061 | Saleh Mahmud Sami | UI/UX design                           |
 
 ---
 
