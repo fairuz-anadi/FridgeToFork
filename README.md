@@ -36,11 +36,11 @@ approachable for everyday cooks.
 
 ## Team Members
 
-| ID          | Name              | Role      |
-|-------------|-------------------|-----------|
-| 20230104123 | Easteak Ahmed     | Lead      |
-| 20220204061 | Saleh Mahmud Sami | Front-end |
-| 20230104121 | Fairuz Anadi      | Back-end  |
+| ID          | Name              | Role                                   |
+|-------------|-------------------|----------------------------------------|
+| 20230104121 | Fairuz Anadi      | Lead — back-end and deployment         |
+| 20230104123 | Easteak Ahmed     | UI/UX design                           |
+| 20220204061 | Saleh Mahmud Sami | Front-end                              |
 
 ---
 
