@@ -179,6 +179,8 @@ class PantryScanController extends Controller
                             'type' => 'image_url',
                             'image_url' => [
                                 'url' => 'data:' . $photo->getMimeType() . ';base64,' . base64_encode($photo->get()),
+                                // Busy shelves need the full-resolution pass to spot small items.
+                                'detail' => 'high',
                             ],
                         ],
                     ],
