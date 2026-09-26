@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
@@ -71,9 +72,15 @@ class AuthController extends Controller
             'id_token' => 'required|string',
         ]);
 
-        $googleResponse = Http::get('https://oauth2.googleapis.com/tokeninfo', [
-            'id_token' => $validated['id_token'],
-        ]);
+        try {
+            $googleResponse = Http::timeout(10)->get('https://oauth2.googleapis.com/tokeninfo', [
+                'id_token' => $validated['id_token'],
+            ]);
+        } catch (ConnectionException) {
+            return response()->json([
+                'message' => 'Google could not be reached to check your sign-in. Please try again.',
+            ], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
 
         if ($googleResponse->failed()) {
             return response()->json([

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -71,6 +72,15 @@ class GoogleSignInTest extends TestCase
         $this->assertSame('google-123', $user->google_id);
         $this->assertSame('cook', $user->username);
         $this->assertTrue(Hash::check('secret-pass', $user->password));
+    }
+
+    public function test_google_being_unreachable_gives_a_clear_error(): void
+    {
+        Http::fake(['oauth2.googleapis.com/*' => fn () => throw new ConnectionException('Connection timed out')]);
+
+        $this->postJson('/api/auth/google', ['id_token' => 'signed-token'])
+            ->assertStatus(503)
+            ->assertJsonPath('message', 'Google could not be reached to check your sign-in. Please try again.');
     }
 
     public function test_a_token_for_another_app_is_rejected(): void
