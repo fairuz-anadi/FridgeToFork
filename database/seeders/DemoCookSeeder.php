@@ -25,6 +25,26 @@ class DemoCookSeeder extends Seeder
         'Chopped Tomatoes', 'Parsley', 'Green Chilli', 'Bell Pepper',
     ];
 
+    /**
+     * Amounts and days-until-expiry for part of the demo fridge, so the
+     * shopping list can show shortfalls and "use it up first" has something
+     * to rank. Dates are relative to the day the seeder runs.
+     *
+     * @var array<string, array{0: float|null, 1: string|null, 2: int|null}>
+     */
+    private const FRIDGE_DETAILS = [
+        'Rice' => [250, 'g', null],
+        'Pasta' => [500, 'g', null],
+        'Egg' => [4, null, 6],
+        'Chicken Breast' => [300, 'g', 1],
+        'Lentils' => [400, 'g', null],
+        'Parsley' => [1, 'bunch', 1],
+        'Green Chilli' => [null, null, 2],
+        'Tomato' => [3, null, 3],
+        'Lemon' => [2, null, 8],
+        'Bell Pepper' => [1, null, 2],
+    ];
+
     public function run(): void
     {
         $demo = User::firstOrCreate(
@@ -49,10 +69,16 @@ class DemoCookSeeder extends Seeder
                 continue;
             }
 
-            PantryItem::firstOrCreate([
-                'user_id' => $demo->id,
-                'ingredient_id' => $ingredient->id,
-            ]);
+            [$quantity, $unit, $days] = self::FRIDGE_DETAILS[$name] ?? [null, null, null];
+
+            PantryItem::updateOrCreate(
+                ['user_id' => $demo->id, 'ingredient_id' => $ingredient->id],
+                [
+                    'quantity' => $quantity,
+                    'unit' => $unit,
+                    'expires_on' => $days === null ? null : Carbon::today()->addDays($days)->toDateString(),
+                ]
+            );
         }
 
         $this->seedMealPlan($demo);

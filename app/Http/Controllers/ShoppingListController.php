@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Services\IngredientParser;
 use App\Models\Ingredient;
 use App\Models\MealPlanEntry;
+use App\Models\PantryItem;
 use App\Models\Recipe;
 use App\Models\ShoppingListItem;
 use Illuminate\Http\Request;
@@ -12,11 +14,16 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
- * Auto Shopping List — everything a week of planned meals needs that the
- * fridge does not already have, grouped by supermarket aisle.
+ * Auto Shopping List — everything a week of planned meals needs, grouped by
+ * supermarket aisle. Ingredients already in the fridge stay on the list,
+ * marked with how much is held, and only the shortfall is left to buy.
  */
 class ShoppingListController extends Controller
 {
+    public function __construct(private IngredientParser $parser)
+    {
+    }
+
     public function index(Request $request)
     {
         return response()->json($this->payload($request));
@@ -50,7 +57,7 @@ class ShoppingListController extends Controller
 
     /**
      * Build the list from the planned week (default) or from an explicit set
-     * of recipes. Anything already in the fridge is left off.
+     * of recipes, compared against the quantities in the fridge.
      */
     public function generate(Request $request)
     {
@@ -96,11 +103,11 @@ class ShoppingListController extends Controller
             ]));
         }
 
-        $pantryIds = ($validated['ignore_pantry'] ?? false)
-            ? collect()
-            : $user->pantryItems()->pluck('ingredient_id');
+        $aggregated = $this->aggregate($sources);
 
-        $aggregated = $this->aggregate($sources, $pantryIds);
+        if (!($validated['ignore_pantry'] ?? false)) {
+            $aggregated = $this->compareWithPantry($aggregated, $user->pantryItems()->get()->keyBy('ingredient_id'));
+        }
 
         if ($validated['replace'] ?? true) {
             $user->shoppingListItems()->where('source', 'auto')->delete();
@@ -124,6 +131,7 @@ class ShoppingListController extends Controller
             ShoppingListItem::create(array_merge($row, [
                 'user_id' => $user->id,
                 'source' => 'auto',
+                'is_checked' => ($row['pantry_status'] ?? null) === 'covered',
             ]));
         }
 
@@ -178,9 +186,8 @@ class ShoppingListController extends Controller
 
     /**
      * @param  Collection<int, array{recipe: Recipe, servings: int}>  $sources
-     * @param  Collection<int, int>  $pantryIds
      */
-    private function aggregate(Collection $sources, Collection $pantryIds): array
+    private function aggregate(Collection $sources): array
     {
         $rows = [];
 
@@ -190,10 +197,6 @@ class ShoppingListController extends Controller
             $scale = $source['servings'] / max(1, (int) ($recipe->servings ?: 1));
 
             foreach ($recipe->ingredientRecords as $ingredient) {
-                if ($pantryIds->contains($ingredient->id)) {
-                    continue;
-                }
-
                 $unit = $ingredient->pivot->unit;
                 $key = $ingredient->id . '|' . ($unit ?? '');
                 $quantity = $ingredient->pivot->quantity === null
@@ -213,6 +216,10 @@ class ShoppingListController extends Controller
                     'name' => $ingredient->name,
                     'quantity' => $quantity,
                     'unit' => $unit,
+                    'needed_quantity' => null,
+                    'pantry_quantity' => null,
+                    'pantry_unit' => null,
+                    'pantry_status' => null,
                     'aisle' => $ingredient->aisle,
                     'recipe_titles' => [$recipe->title],
                 ];
@@ -222,11 +229,99 @@ class ShoppingListController extends Controller
         return collect($rows)
             ->map(function (array $row) {
                 $row['recipe_titles'] = array_values(array_unique($row['recipe_titles']));
+                $row['needed_quantity'] = $row['quantity'];
 
                 return $row;
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * Mark each row with what the fridge holds and reduce the quantity to
+     * the shortfall. Having some of an ingredient is not the same as having
+     * enough of it, so nothing is dropped from the list:
+     *   covered — the fridge holds enough (row is pre-ticked)
+     *   partial — the fridge holds some; quantity is what is left to buy
+     *   check   — it is in the fridge but the amount was not recorded, or
+     *             the units cannot be compared
+     *
+     * @param  Collection<int, PantryItem>  $pantry  keyed by ingredient_id
+     */
+    private function compareWithPantry(array $rows, Collection $pantry): array
+    {
+        // Several rows can share an ingredient (e.g. "2 cups rice" and
+        // "200 g rice"); the fridge stock is used up across them in turn.
+        $remaining = [];
+
+        foreach ($rows as &$row) {
+            $item = $pantry->get($row['ingredient_id']);
+            if (!$item) {
+                continue;
+            }
+
+            $row['pantry_quantity'] = $item->quantity;
+            $row['pantry_unit'] = $item->unit;
+
+            if ($item->quantity === null) {
+                $row['pantry_status'] = 'check';
+                continue;
+            }
+
+            if ($row['quantity'] === null) {
+                // "Salt, to taste" — any amount in the fridge will do.
+                $row['pantry_status'] = 'covered';
+                continue;
+            }
+
+            $have = $remaining[$item->id] ?? $item->quantity;
+            $factor = $this->unitFactor($row['unit'], $item->unit);
+
+            if ($factor === null) {
+                $row['pantry_status'] = 'check';
+                continue;
+            }
+
+            // Convert the requirement into the fridge item's unit.
+            $need = $row['quantity'] * $factor;
+
+            if ($have >= $need) {
+                $row['pantry_status'] = 'covered';
+                $remaining[$item->id] = $have - $need;
+                continue;
+            }
+
+            $row['pantry_status'] = 'partial';
+            $row['quantity'] = round(($need - $have) / $factor, 2);
+            $remaining[$item->id] = 0;
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /** Weight and volume units that convert to grams reliably enough to compare. */
+    private const MEASURED_UNITS = ['g', 'kg', 'mg', 'oz', 'lb', 'ml', 'l', 'cup', 'tbsp', 'tsp'];
+
+    /**
+     * How many of $to one $from is worth, or null when they cannot be compared.
+     * Counts ("2 chicken breasts", "1 bunch") are only compared with the same
+     * count unit — guessing what a piece weighs would mark too little as enough.
+     */
+    private function unitFactor(?string $from, ?string $to): ?float
+    {
+        if ($from === $to) {
+            return 1.0;
+        }
+
+        if (!in_array($from, self::MEASURED_UNITS, true) || !in_array($to, self::MEASURED_UNITS, true)) {
+            return null;
+        }
+
+        $fromGrams = $this->parser->toGrams(1, $from);
+        $toGrams = $this->parser->toGrams(1, $to);
+
+        return $fromGrams && $toGrams ? $fromGrams / $toGrams : null;
     }
 
     private function payload(Request $request): array

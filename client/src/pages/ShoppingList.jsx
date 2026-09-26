@@ -4,8 +4,9 @@ import IngredientPicker from "../components/IngredientPicker";
 import { useToast } from "../components/useToast";
 
 /**
- * Auto Shopping List — what the planned week needs that the fridge does not
- * already have, grouped by aisle and shareable as plain text.
+ * Auto Shopping List — what the planned week needs, grouped by aisle and
+ * shareable as plain text. Fridge items stay visible with how much is held,
+ * so the cook can judge whether it is enough.
  */
 export default function ShoppingList({ user }) {
   const [items, setItems] = useState([]);
@@ -86,8 +87,8 @@ export default function ShoppingList({ user }) {
             Shopping list
           </h1>
           <p className="m-0 text-sm text-[var(--muted)]">
-            {meta ? `${meta.remaining} of ${meta.total} still to buy` : "Loading…"} — anything already
-            in your fridge is left off.
+            {meta ? `${meta.remaining} of ${meta.total} still to buy` : "Loading…"} — items in your
+            fridge are compared with what the week needs, so you only buy what&apos;s missing.
           </p>
         </div>
 
@@ -171,6 +172,7 @@ export default function ShoppingList({ user }) {
                           for {item.recipe_titles.join(", ")}
                         </em>
                       )}
+                      <PantryNote item={item} />
                     </span>
                     <button
                       type="button"
@@ -189,6 +191,35 @@ export default function ShoppingList({ user }) {
       )}
     </div>
   );
+}
+
+const NOTE_STYLES = {
+  covered: "pantry-note pantry-note--covered",
+  partial: "pantry-note pantry-note--partial",
+  check: "pantry-note pantry-note--check",
+};
+
+function amount(quantity, unit) {
+  if (quantity === null || quantity === undefined) return "";
+  const rounded = Math.round(quantity * 100) / 100;
+  return `${rounded}${unit ? ` ${unit}` : ""}`;
+}
+
+/** What the fridge already holds for this item, when anything. */
+function PantryNote({ item }) {
+  if (!item.pantry_status) return null;
+
+  const have = amount(item.pantry_quantity, item.pantry_unit);
+  const need = amount(item.needed_quantity, item.unit);
+  const text = {
+    covered: `In your fridge${have ? ` (${have})` : ""} — enough for this week`,
+    partial: `You have ${have}${need ? ` of ${need} needed` : ""} — buying the rest`,
+    check: have
+      ? `You have ${have} in your fridge — check it covers ${need || "this"}`
+      : "In your fridge — amount not recorded, check you have enough",
+  }[item.pantry_status];
+
+  return <span className={NOTE_STYLES[item.pantry_status]}>{text}</span>;
 }
 
 function formatQuantity(item) {

@@ -264,6 +264,21 @@ export const api = {
       { method: "PUT", body: JSON.stringify({ names }) },
       { errorMessage: "We couldn't update your fridge." }
     ),
+  updatePantryItem: (id, body) =>
+    request(
+      `/pantry/${id}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+      { errorMessage: "We couldn't update that fridge item." }
+    ),
+  scanPantryPhoto: (photo) => {
+    const body = new FormData();
+    body.append("photo", photo, photo.name || "fridge.jpg");
+    return request(
+      "/pantry/scan",
+      { method: "POST", body },
+      { errorMessage: "We couldn't scan that photo right now." }
+    );
+  },
   removePantryItem: (id) =>
     request(
       `/pantry/${id}`,

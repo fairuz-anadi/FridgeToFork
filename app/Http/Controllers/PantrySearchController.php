@@ -63,6 +63,13 @@ class PantrySearchController extends Controller
             'limit' => $validated['limit'] ?? null,
         ]);
 
+        // Signed-in cooks: rank recipes that use soon-to-expire fridge items first.
+        $useSoon = $user
+            ? $user->pantryItems()->useSoon()->with('ingredient:id,name')->get()
+                ->filter(fn ($item) => $ingredientIds->contains($item->ingredient_id))
+            : collect();
+        $filters['expiring_ids'] = $useSoon->pluck('ingredient_id')->all();
+
         $favoriteIds = $user ? $user->favorites()->pluck('recipes.id') : collect();
 
         $matches = $this->matcher->match($ingredientIds, $filters)->map(function (array $row) use ($favoriteIds) {
@@ -76,6 +83,7 @@ class PantrySearchController extends Controller
                 'have_count' => $row['have_count'],
                 'required_count' => $row['required_count'],
                 'missing' => $row['missing'],
+                'uses_expiring' => $row['uses_expiring'],
             ];
         });
 
@@ -85,6 +93,10 @@ class PantrySearchController extends Controller
                 'ingredient_count' => $ingredientIds->count(),
                 'max_missing' => $filters['max_missing'] ?? 3,
                 'cook_now' => $matches->where('match_ratio', 1.0)->count(),
+                'use_soon' => $useSoon
+                    ->map(fn ($item) => ['name' => $item->ingredient?->name, 'days_left' => $item->days_left])
+                    ->sortBy('days_left')
+                    ->values(),
             ],
         ]);
     }

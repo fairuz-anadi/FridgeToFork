@@ -388,23 +388,134 @@ class FridgeToForkFeaturesTest extends TestCase
         );
     }
 
-    public function test_ingredients_already_in_the_fridge_are_left_off_the_list(): void
+    private function planTomatoPasta(): void
     {
         $recipe = $this->makeRecipe();
-        $this->stockFridge(['Pasta', 'Salt']);
-        $monday = Carbon::today()->startOfWeek(Carbon::MONDAY)->toDateString();
 
         $this->actingAs($this->user)->postJson('/api/meal-plan', [
             'recipe_id' => $recipe->id,
-            'plan_date' => $monday,
+            'plan_date' => Carbon::today()->startOfWeek(Carbon::MONDAY)->toDateString(),
             'meal_slot' => 'dinner',
+            'servings' => 2,
+        ]);
+    }
+
+    private function generateList()
+    {
+        return collect($this->actingAs($this->user)->postJson('/api/shopping-list/generate', [])->json('data'))
+            ->keyBy('name');
+    }
+
+    public function test_fridge_items_with_no_recorded_amount_stay_on_the_list_to_check(): void
+    {
+        $this->planTomatoPasta();
+        $this->stockFridge(['Pasta']);
+
+        $pasta = $this->generateList()->get('Pasta');
+
+        // Having some pasta is not the same as having enough of it.
+        $this->assertSame('check', $pasta['pantry_status']);
+        $this->assertSame(200.0, (float) $pasta['quantity']);
+        $this->assertFalse($pasta['is_checked']);
+    }
+
+    public function test_only_the_shortfall_is_left_to_buy(): void
+    {
+        $this->planTomatoPasta();
+        PantryItem::create([
+            'user_id' => $this->user->id,
+            'ingredient_id' => Ingredient::resolve('Pasta')->id,
+            'quantity' => 0.05,
+            'unit' => 'kg',
         ]);
 
-        $names = collect(
-            $this->actingAs($this->user)->postJson('/api/shopping-list/generate', [])->json('data')
-        )->pluck('name');
+        $pasta = $this->generateList()->get('Pasta');
 
-        $this->assertEqualsCanonicalizing(['Tomato', 'Olive Oil'], $names->all());
+        $this->assertSame('partial', $pasta['pantry_status']);
+        $this->assertSame(150.0, (float) $pasta['quantity']);
+        $this->assertSame(200.0, (float) $pasta['needed_quantity']);
+        $this->assertSame('kg', $pasta['pantry_unit']);
+    }
+
+    public function test_ingredients_the_fridge_fully_covers_are_ticked_off(): void
+    {
+        $this->planTomatoPasta();
+        PantryItem::create([
+            'user_id' => $this->user->id,
+            'ingredient_id' => Ingredient::resolve('Pasta')->id,
+            'quantity' => 500,
+            'unit' => 'g',
+        ]);
+
+        $list = $this->generateList();
+
+        $this->assertSame('covered', $list->get('Pasta')['pantry_status']);
+        $this->assertTrue($list->get('Pasta')['is_checked']);
+        $this->assertNull($list->get('Tomato')['pantry_status']);
+        $this->assertFalse($list->get('Tomato')['is_checked']);
+    }
+
+    // ── Expiry tracking: use it up first ─────────────────────────────────
+
+    public function test_new_fridge_items_get_an_estimated_expiry_date(): void
+    {
+        $items = collect($this->actingAs($this->user)->postJson('/api/pantry', ['name' => 'Tomato'])->json('data'));
+        $tomato = $items->firstWhere('ingredient.name', 'Tomato');
+
+        $this->assertSame(Carbon::today()->addDays(5)->toDateString(), $tomato['expires_on']);
+        $this->assertSame(5, $tomato['days_left']);
+        $this->assertSame('ok', $tomato['expiry_status']);
+
+        // Cupboard staples get no automatic date.
+        $items = collect($this->actingAs($this->user)->postJson('/api/pantry', ['name' => 'Salt'])->json('data'));
+        $this->assertNull($items->firstWhere('ingredient.name', 'Salt')['expires_on']);
+    }
+
+    public function test_cooks_can_record_quantity_and_expiry(): void
+    {
+        $this->stockFridge(['Milk']);
+        $item = $this->user->pantryItems()->first();
+
+        $response = $this->actingAs($this->user)->patchJson("/api/pantry/{$item->id}", [
+            'quantity' => 1.5,
+            'unit' => 'l',
+            'expires_on' => Carbon::today()->addDay()->toDateString(),
+        ])->assertOk();
+
+        $milk = collect($response->json('data'))->first();
+        $this->assertSame(1.5, (float) $milk['quantity']);
+        $this->assertSame('soon', $milk['expiry_status']);
+
+        $intruder = User::create([
+            'name' => 'Intruder', 'username' => 'intruder2', 'email' => 'intruder2@example.test',
+            'password' => Hash::make('Password123!'),
+        ]);
+        $this->actingAs($intruder)->patchJson("/api/pantry/{$item->id}", ['quantity' => 0])->assertForbidden();
+    }
+
+    public function test_recipes_using_soon_to_expire_items_are_ranked_first(): void
+    {
+        $pasta = $this->makeRecipe();
+        $omelette = $this->makeRecipe([
+            'title' => 'Spinach Omelette',
+            'ingredients' => ['3 eggs', '1 handful spinach', '1 tsp salt'],
+        ]);
+
+        foreach (['Pasta', 'Tomato', 'Olive Oil', 'Salt', 'Egg', 'Spinach'] as $name) {
+            PantryItem::create([
+                'user_id' => $this->user->id,
+                'ingredient_id' => Ingredient::resolve($name)->id,
+                'expires_on' => $name === 'Spinach' ? Carbon::today()->addDay() : null,
+            ]);
+        }
+
+        $response = $this->actingAs($this->user)->postJson('/api/pantry/search', ['use_pantry' => true])->assertOk();
+
+        $this->assertSame($omelette->id, $response->json('data.0.recipe.id'));
+        $this->assertSame(['Spinach'], $response->json('data.0.uses_expiring'));
+        $this->assertSame([], $response->json('data.1.uses_expiring'));
+        $this->assertSame('Spinach', $response->json('meta.use_soon.0.name'));
+        $this->assertSame($pasta->id, $response->json('data.1.recipe.id'));
     }
 
     public function test_the_same_ingredient_across_two_meals_is_added_up_once(): void

@@ -3339,3 +3339,152 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .chat-panel, .chat-msg--typing span, .chat-launcher.is-new::before, .chef-icon__spark, .chat-launcher__label { animation: none; }
 }
+
+/* ── Fridge: expiry badges, item editor, use-soon hints ─────────────── */
+.fridge-chip__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.fridge-chip__label small { color: var(--muted); font-size: 0.75rem; }
+.fridge-chip__label em {
+  font-style: normal;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: rgba(15, 81, 50, 0.12);
+  color: var(--brand-deep);
+}
+.fridge-chip.is-soon { background: rgba(199, 154, 62, 0.18); }
+.fridge-chip.is-soon .fridge-chip__label em { background: var(--gold); color: #fff; }
+.fridge-chip.is-expired { background: rgba(180, 40, 40, 0.10); color: #8a2323; }
+.fridge-chip.is-expired .fridge-chip__label em { background: #b42828; color: #fff; }
+.fridge-chip.is-active { box-shadow: 0 0 0 2px var(--brand); }
+
+.fridge-editor {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: #fff;
+  font-size: 0.85rem;
+}
+.fridge-editor__title { margin: 0; font-weight: 700; color: var(--text); }
+.fridge-editor__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fridge-editor label { display: grid; gap: 4px; }
+.fridge-editor label span { font-weight: 600; color: var(--muted); font-size: 0.78rem; }
+.fridge-editor input,
+.fridge-editor select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: 7px 9px;
+  font: inherit;
+  background: #fff;
+}
+.fridge-editor__hint { margin: 0; color: var(--muted-light); font-size: 0.75rem; }
+.fridge-editor__actions,
+.fridge-scan__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.fridge-editor__actions button,
+.fridge-scan__actions button {
+  border: none;
+  border-radius: var(--r-pill);
+  padding: 7px 16px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.fridge-editor__actions button.is-quiet,
+.fridge-scan__actions button.is-quiet { background: transparent; color: var(--muted); border: 1px solid var(--border-strong); }
+.fridge-scan__actions button:disabled { opacity: 0.45; cursor: default; }
+
+.use-soon {
+  margin-bottom: 20px;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(199, 154, 62, 0.45);
+  background: var(--gold-light);
+  font-size: 0.88rem;
+  color: var(--brand-deep);
+}
+.use-soon span { color: var(--muted); }
+.use-soon-badge {
+  margin: 0;
+  padding: 5px 10px;
+  border-radius: var(--r-sm);
+  background: var(--gold-light);
+  color: var(--brand-deep);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Snap your fridge ───────────────────────────────────────────────── */
+.fridge-scan { margin-bottom: 16px; }
+.fridge-scan__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 11px 16px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: linear-gradient(135deg, var(--brand) 0%, #1f7a4f 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s;
+}
+.fridge-scan__button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-lg); }
+.fridge-scan__button:disabled { opacity: 0.75; cursor: progress; }
+.fridge-scan__button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.fridge-scan__hint { margin: 6px 0 0; text-align: center; font-size: 0.75rem; color: var(--muted-light); }
+
+.fridge-scan__panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: #fff;
+}
+.fridge-scan__panel img { width: 100%; max-height: 180px; object-fit: cover; border-radius: var(--r-sm); }
+.fridge-scan__panel img.is-scanning { animation: scan-pulse 1.2s ease-in-out infinite; }
+@keyframes scan-pulse { 50% { opacity: 0.55; } }
+.fridge-scan__status { margin: 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
+.fridge-scan__panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow-y: auto; }
+.fridge-scan__panel label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; cursor: pointer; }
+.fridge-scan__panel label input { accent-color: var(--brand); }
+.fridge-scan__panel label small { margin-left: auto; color: var(--muted-light); font-size: 0.72rem; }
+.fridge-scan__panel label.is-owned { color: var(--muted-light); cursor: default; }
+
+/* ── Shopping list: what the fridge already holds ──────────────────── */
+.pantry-note {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.pantry-note--covered { color: var(--brand); }
+.pantry-note--partial { color: var(--accent); }
+.pantry-note--check { color: #8a6d1f; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fridge-scan__panel img.is-scanning { animation: none; }
+}

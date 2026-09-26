@@ -12,6 +12,7 @@ use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\IngredientController;
 use App\Http\Controllers\MealPlanController;
 use App\Http\Controllers\PantryController;
+use App\Http\Controllers\PantryScanController;
 use App\Http\Controllers\PantrySearchController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RecipeController;
@@ -37,6 +38,8 @@ Route::post('contact', [ContactController::class, 'store'])->middleware('throttl
 Route::get('ingredients', [IngredientController::class, 'index']);
 Route::get('ingredients/aisles', [IngredientController::class, 'aisles']);
 Route::post('pantry/search', PantrySearchController::class);
+// Snap your fridge — works signed out too; the page decides where results go.
+Route::post('pantry/scan', PantryScanController::class)->middleware('throttle:6,1');
 
 // Recipe chatbot — works signed out too; uses the fridge when signed in.
 Route::post('chat', ChatController::class)->middleware('throttle:15,1');
@@ -71,6 +74,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('pantry', [PantryController::class, 'index']);
     Route::post('pantry', [PantryController::class, 'store']);
     Route::put('pantry', [PantryController::class, 'sync']);
+    Route::patch('pantry/{pantryItem}', [PantryController::class, 'update']);
     Route::delete('pantry/{pantryItem}', [PantryController::class, 'destroy']);
 
     // Meal planner

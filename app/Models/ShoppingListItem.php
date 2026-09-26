@@ -15,6 +15,10 @@ class ShoppingListItem extends Model
         'name',
         'quantity',
         'unit',
+        'needed_quantity',
+        'pantry_quantity',
+        'pantry_unit',
+        'pantry_status',
         'aisle',
         'is_checked',
         'source',
@@ -23,6 +27,8 @@ class ShoppingListItem extends Model
 
     protected $casts = [
         'quantity' => 'float',
+        'needed_quantity' => 'float',
+        'pantry_quantity' => 'float',
         'is_checked' => 'boolean',
         'recipe_titles' => 'array',
     ];

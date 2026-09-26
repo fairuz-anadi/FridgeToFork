@@ -30,14 +30,18 @@ class PantryController extends Controller
 
         $ingredient = Ingredient::resolve($validated['name']);
 
-        PantryItem::updateOrCreate(
-            ['user_id' => $request->user()->id, 'ingredient_id' => $ingredient->id],
-            [
-                'quantity' => $validated['quantity'] ?? null,
-                'unit' => $validated['unit'] ?? null,
-                'expires_on' => $validated['expires_on'] ?? null,
-            ]
-        );
+        $item = PantryItem::firstOrNew([
+            'user_id' => $request->user()->id,
+            'ingredient_id' => $ingredient->id,
+        ]);
+
+        // Only overwrite what was sent; a new item without a date gets the
+        // typical shelf life for its aisle.
+        $item->fill(collect($validated)->only(['quantity', 'unit', 'expires_on'])->all());
+        if (!$item->exists && !array_key_exists('expires_on', $validated)) {
+            $item->expires_on = PantryItem::estimatedExpiry($ingredient);
+        }
+        $item->save();
 
         return response()->json([
             'message' => $ingredient->name . ' added to your fridge.',
@@ -61,14 +65,37 @@ class PantryController extends Controller
         $user->pantryItems()->whereNotIn('ingredient_id', $ids)->delete();
 
         foreach ($ids as $ingredientId) {
-            PantryItem::firstOrCreate([
-                'user_id' => $user->id,
-                'ingredient_id' => $ingredientId,
-            ]);
+            PantryItem::firstOrCreate(
+                ['user_id' => $user->id, 'ingredient_id' => $ingredientId],
+                ['expires_on' => PantryItem::estimatedExpiry(Ingredient::find($ingredientId))]
+            );
         }
 
         return response()->json([
             'message' => 'Fridge updated.',
+            'data' => $this->itemsFor($request),
+        ]);
+    }
+
+    /** Record how much is left and when it expires. */
+    public function update(Request $request, PantryItem $pantryItem)
+    {
+        if ((string) $pantryItem->user_id !== (string) $request->user()->id) {
+            return response()->json([
+                'message' => 'You can only edit your own fridge.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'quantity' => 'sometimes|nullable|numeric|min:0',
+            'unit' => 'sometimes|nullable|string|max:30',
+            'expires_on' => 'sometimes|nullable|date',
+        ]);
+
+        $pantryItem->fill($validated)->save();
+
+        return response()->json([
+            'message' => 'Fridge item updated.',
             'data' => $this->itemsFor($request),
         ]);
     }

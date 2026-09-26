@@ -32,12 +32,14 @@ class PantryMatchService
      * @param  array{
      *     max_missing?: int, diets?: array<int, string>, skill?: string|null,
      *     cuisine?: string|null, region?: string|null, max_minutes?: int|null,
-     *     allergies?: array<int, string>, limit?: int
+     *     allergies?: array<int, string>, limit?: int,
+     *     expiring_ids?: array<int, int>
      * }  $filters
      */
     public function match($ingredientIds, array $filters = []): Collection
     {
         $ingredientIds = collect($ingredientIds)->map(fn ($id) => (int) $id)->unique();
+        $expiringIds = collect($filters['expiring_ids'] ?? [])->map(fn ($id) => (int) $id);
         $maxMissing = (int) ($filters['max_missing'] ?? 3);
         $limit = (int) ($filters['limit'] ?? 30);
 
@@ -64,7 +66,7 @@ class PantryMatchService
         $recipes = $query->get();
 
         return $recipes
-            ->map(fn (Recipe $recipe) => $this->score($recipe, $ingredientIds))
+            ->map(fn (Recipe $recipe) => $this->score($recipe, $ingredientIds, $expiringIds))
             ->reject(function (array $row) use ($maxMissing, $filters) {
                 if ($row['required_count'] === 0) {
                     return true;
@@ -78,7 +80,9 @@ class PantryMatchService
                     || $this->hitsAllergy($row['recipe'], $filters);
             })
             ->sortBy([
-                fn (array $a, array $b) => $b['match_ratio'] <=> $a['match_ratio'],
+                // "Use it up first": each soon-to-expire ingredient a recipe
+                // uses is worth an extra 10 points of match.
+                fn (array $a, array $b) => $this->rank($b) <=> $this->rank($a),
                 fn (array $a, array $b) => count($a['missing']) <=> count($b['missing']),
                 fn (array $a, array $b) => $b['recipe']->average_rating <=> $a['recipe']->average_rating,
             ])
@@ -114,10 +118,16 @@ class PantryMatchService
         return array_merge($base, array_filter($overrides, fn ($value) => $value !== null && $value !== ''));
     }
 
+    private function rank(array $row): float
+    {
+        return $row['match_ratio'] + 0.1 * count($row['uses_expiring']);
+    }
+
     /**
      * @param  Collection<int, int>  $ingredientIds
+     * @param  Collection<int, int>  $expiringIds
      */
-    private function score(Recipe $recipe, Collection $ingredientIds): array
+    private function score(Recipe $recipe, Collection $ingredientIds, ?Collection $expiringIds = null): array
     {
         $required = $recipe->ingredientRecords->reject(fn ($i) => (bool) $i->pivot->is_optional);
         $requiredCount = $required->count();
@@ -130,6 +140,11 @@ class PantryMatchService
             'required_count' => $requiredCount,
             'have_count' => $have->count(),
             'match_ratio' => $requiredCount > 0 ? round($have->count() / $requiredCount, 3) : 0.0,
+            'uses_expiring' => $have
+                ->filter(fn ($i) => $expiringIds?->contains($i->id))
+                ->pluck('name')
+                ->values()
+                ->all(),
             'missing' => $missing
                 ->map(fn ($i) => ['id' => $i->id, 'name' => $i->name, 'aisle' => $i->aisle, 'raw_text' => $i->pivot->raw_text])
                 ->values()

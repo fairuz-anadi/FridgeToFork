@@ -72,8 +72,10 @@ approachable for everyday cooks.
 | 5 | Favourites & Meal Planner | `/meal-plan` — a week grid with per-day calorie totals                |
 | 6 | Reviews & Ratings         | Recipe library — 5-star ratings, comments, points-based leaderboard   |
 | 7 | Nutrition Insights        | Calories and macro split per serving, on every recipe                 |
-| 8 | Auto Shopping List        | `/shopping-list` — built from the planned week, minus what's in the fridge, grouped by aisle |
+| 8 | Auto Shopping List        | `/shopping-list` — built from the planned week and compared with fridge quantities: only the shortfall is bought, fully covered items are pre-ticked, and items with no recorded amount are flagged to check. Grouped by aisle |
 | 9 | Kitchen Assistant Chatbot | "Ask the chef" button on every page — suggests recipes from what you have, by cuisine, diet or time, and explains the app. Uses Claude when `ANTHROPIC_API_KEY` is set, otherwise a built-in assistant |
+| 10 | Use It Up First          | `/fridge` — every fridge item has an expiry date (estimated by aisle when not entered); items expiring within 3 days are highlighted and recipes that use them rank first |
+| 11 | Snap Your Fridge         | `/fridge` — photograph the fridge and Claude lists the ingredients it sees; the cook confirms them before they are added (needs `ANTHROPIC_API_KEY`) |
 
 ### How the ingredient matching works
 
@@ -172,8 +174,8 @@ PostgreSQL instead of SQLite, uncomment the `pgsql` block in `.env`.
 php artisan test
 ```
 
-48 tests cover ingredient parsing, timer detection, pantry matching, the cuisine
-map, meal planning, shopping-list generation, nutrition and the chatbot. The frontend is
+53 tests cover ingredient parsing, timer detection, pantry matching, the cuisine
+map, meal planning, shopping-list generation against fridge quantities, expiry ranking, nutrition and the chatbot. The frontend is
 linted with `npm run lint --prefix client`.
 
 ---

@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/api";
+import FridgeScanner from "../components/FridgeScanner";
 import IngredientPicker from "../components/IngredientPicker";
 import NutritionPanel from "../components/NutritionPanel";
 import { useToast } from "../components/useToast";
+
+const UNITS = ["", "g", "kg", "ml", "l", "piece", "cup", "tbsp", "tsp", "packet", "can", "bunch"];
+
+function expiryLabel(item) {
+  const days = item.days_left;
+  if (days === null || days === undefined) return null;
+  if (days < 0) return "expired";
+  if (days === 0) return "today";
+  if (days === 1) return "1 day";
+  return `${days} days`;
+}
+
+function daysPhrase(days) {
+  if (days === 0) return "today";
+  if (days === 1) return "tomorrow";
+  return `${days} days`;
+}
 
 const QUICK_ADD = [
   "Onion", "Garlic", "Tomato", "Egg", "Rice", "Pasta", "Potato",
@@ -26,6 +44,7 @@ export default function PantryPage({ user, onRequireAuth }) {
   const [maxMissing, setMaxMissing] = useState(4);
   const [maxMinutes, setMaxMinutes] = useState("");
   const [skill, setSkill] = useState("");
+  const [editing, setEditing] = useState(null);
   const { showToast } = useToast();
 
   const ingredientNames = useMemo(
@@ -97,6 +116,34 @@ export default function PantryPage({ user, onRequireAuth }) {
     }
   }
 
+  async function addMany(names) {
+    if (!user) {
+      setGuestIngredients((current) => {
+        const owned = new Set(current.map((name) => name.toLowerCase()));
+        return [...current, ...names.filter((name) => !owned.has(name.toLowerCase()))];
+      });
+      return;
+    }
+
+    try {
+      const response = await api.syncPantry([...ingredientNames, ...names]);
+      setPantry(response.data);
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+
+  async function saveItem(item, changes) {
+    try {
+      const response = await api.updatePantryItem(item.id, changes);
+      setPantry(response.data);
+      setEditing(null);
+      showToast(`${item.ingredient?.name} updated.`);
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+
   async function removeIngredient(item) {
     if (!user) {
       setGuestIngredients((current) => current.filter((name) => name !== item));
@@ -127,17 +174,41 @@ export default function PantryPage({ user, onRequireAuth }) {
             : "Add ingredients to search now — sign in to keep your fridge between visits."}
         </p>
 
+        <FridgeScanner owned={ingredientNames} onAdd={addMany} />
+
         <IngredientPicker onAdd={addIngredient} exclude={ingredientNames} />
 
         <div className="mt-5 flex flex-wrap gap-2">
           {user
             ? pantry.map((item) => (
-                <Chip key={item.id} label={item.ingredient?.name} onRemove={() => removeIngredient(item)} />
+                <Chip
+                  key={item.id}
+                  label={item.ingredient?.name}
+                  item={item}
+                  active={editing === item.id}
+                  onEdit={() => setEditing(editing === item.id ? null : item.id)}
+                  onRemove={() => removeIngredient(item)}
+                />
               ))
             : guestIngredients.map((name) => (
                 <Chip key={name} label={name} onRemove={() => removeIngredient(name)} />
               ))}
         </div>
+
+        {user && pantry.length > 0 && !editing && (
+          <p className="mt-3 mb-0 text-xs text-[var(--muted-light)]">
+            Tap an item to record how much you have and when it expires.
+          </p>
+        )}
+
+        {user && editing && (
+          <ItemEditor
+            key={editing}
+            item={pantry.find((item) => item.id === editing)}
+            onSave={saveItem}
+            onClose={() => setEditing(null)}
+          />
+        )}
 
         {quickAdd.length > 0 && (
           <div className="mt-5">
@@ -234,6 +305,14 @@ export default function PantryPage({ user, onRequireAuth }) {
               )}
             </header>
 
+            {meta?.use_soon?.length > 0 && (
+              <div className="use-soon">
+                <strong>Use these soon:</strong>{" "}
+                {meta.use_soon.map((item) => `${item.name} (${daysPhrase(item.days_left)})`).join(", ")}
+                <span> — recipes that use them are shown first.</span>
+              </div>
+            )}
+
             {cookNow.length > 0 && (
               <MatchGroup
                 title="Cook right now"
@@ -262,10 +341,24 @@ export default function PantryPage({ user, onRequireAuth }) {
   );
 }
 
-function Chip({ label, onRemove }) {
+function Chip({ label, item, active, onEdit, onRemove }) {
+  const expiry = item ? expiryLabel(item) : null;
+  const amount = item?.quantity ? `${Number(item.quantity)}${item.unit ? ` ${item.unit}` : ""}` : null;
+  const state = `${item?.expiry_status ? ` is-${item.expiry_status}` : ""}${active ? " is-active" : ""}`;
+
   return (
-    <span className="inline-flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--brand-glow)] py-1.5 pl-3 pr-2 text-sm text-[var(--brand-deep)]">
-      {label}
+    <span
+      className={`fridge-chip inline-flex items-center gap-2 rounded-[var(--r-pill)] bg-[var(--brand-glow)] py-1.5 pl-3 pr-2 text-sm text-[var(--brand-deep)]${state}`}
+    >
+      {onEdit ? (
+        <button type="button" onClick={onEdit} className="fridge-chip__label" title="Edit amount and expiry">
+          {label}
+          {amount && <small>{amount}</small>}
+          {expiry && <em>{expiry}</em>}
+        </button>
+      ) : (
+        label
+      )}
       <button
         type="button"
         onClick={onRemove}
@@ -275,6 +368,66 @@ function Chip({ label, onRemove }) {
         ×
       </button>
     </span>
+  );
+}
+
+function ItemEditor({ item, onSave, onClose }) {
+  const [quantity, setQuantity] = useState(item?.quantity ?? "");
+  const [unit, setUnit] = useState(item?.unit ?? "");
+  const [expiresOn, setExpiresOn] = useState(item?.expires_on ?? "");
+
+  if (!item) return null;
+
+  return (
+    <form
+      className="fridge-editor"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSave(item, {
+          quantity: quantity === "" ? null : Number(quantity),
+          unit: unit || null,
+          expires_on: expiresOn || null,
+        });
+      }}
+    >
+      <p className="fridge-editor__title">{item.ingredient?.name}</p>
+      <div className="fridge-editor__row">
+        <label>
+          <span>Amount</span>
+          <input
+            type="number"
+            min="0"
+            step="any"
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            placeholder="e.g. 500"
+          />
+        </label>
+        <label>
+          <span>Unit</span>
+          <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+            {UNITS.map((option) => (
+              <option key={option} value={option}>
+                {option || "count"}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label>
+        <span>Expires on</span>
+        <input type="date" value={expiresOn} onChange={(event) => setExpiresOn(event.target.value)} />
+      </label>
+      <p className="fridge-editor__hint">
+        Recording the amount lets the shopping list buy only what you&apos;re missing.
+      </p>
+      <div className="fridge-editor__actions">
+        <button type="button" onClick={onClose} className="is-quiet">
+          Close
+        </button>
+        <button type="submit">Save</button>
+      </div>
+    </form>
   );
 }
 
@@ -319,6 +472,13 @@ function MatchCard({ match }) {
       </div>
 
       <NutritionPanel nutrition={recipe.nutrition} compact />
+
+      {match.uses_expiring?.length > 0 && (
+        <p className="use-soon-badge">
+          Uses your {match.uses_expiring.join(", ")} before{" "}
+          {match.uses_expiring.length === 1 ? "it expires" : "they expire"}
+        </p>
+      )}
 
       {match.missing.length > 0 && (
         <p className="m-0 text-xs text-[var(--muted)]">
