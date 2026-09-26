@@ -9,6 +9,7 @@ use App\Models\Review;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
@@ -111,17 +112,31 @@ class AdminController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $user->reviews()->delete();
-        $user->favorites()->detach();
-        $user->recipes->each(function (Recipe $recipe) {
-            if ($recipe->image_path) {
-                Storage::disk('public')->delete($recipe->image_path);
-            }
-            $recipe->reviews()->delete();
-            $recipe->categories()->detach();
-            $recipe->favoritedByUsers()->detach();
+        if ($user->is_admin) {
+            return response()->json([
+                'message' => 'Admin accounts are protected and cannot be deleted.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Tips the user received and reviews on others' recipes point at the
+        // user without a cascade, so they are removed first, all or nothing.
+        DB::transaction(function () use ($user) {
+            $user->receivedTips()->delete();
+            $user->sentTips()->delete();
+            $user->reviews()->delete();
+            $user->favorites()->detach();
+            $user->recipes->each(function (Recipe $recipe) {
+                if ($recipe->image_path) {
+                    Storage::disk('public')->delete($recipe->image_path);
+                }
+                $recipe->reviews()->delete();
+                $recipe->categories()->detach();
+                $recipe->favoritedByUsers()->detach();
+                $recipe->delete();
+            });
+            $user->tokens()->delete();
+            $user->delete();
         });
-        $user->delete();
 
         return response()->json([
             'message' => 'User deleted successfully by admin.',
@@ -150,14 +165,14 @@ class AdminController extends Controller
         ]);
     }
 
-    /** The complaint inbox, open ones first. */
+    /** The complaint inbox: open first, then resolved, archived last. */
     public function contacts(Request $request)
     {
         $status = $request->query('status');
 
         $contacts = ContactSubmission::with('user:id,name,username')
             ->when(in_array($status, ContactSubmission::STATUSES, true), fn ($query) => $query->where('status', $status))
-            ->orderByRaw("CASE WHEN status = 'open' THEN 0 ELSE 1 END")
+            ->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'resolved' THEN 1 ELSE 2 END")
             ->latest()
             ->limit(200)
             ->get();
@@ -167,6 +182,7 @@ class AdminController extends Controller
             'meta' => [
                 'open' => ContactSubmission::where('status', 'open')->count(),
                 'resolved' => ContactSubmission::where('status', 'resolved')->count(),
+                'archived' => ContactSubmission::where('status', 'archived')->count(),
             ],
         ]);
     }
@@ -187,7 +203,11 @@ class AdminController extends Controller
         }
         if (isset($validated['status'])) {
             $contact->status = $validated['status'];
-            $contact->resolved_at = $validated['status'] === 'resolved' ? now() : null;
+            if ($validated['status'] === 'open') {
+                $contact->resolved_at = null;
+            } elseif ($validated['status'] === 'resolved' || !$contact->resolved_at) {
+                $contact->resolved_at = now();
+            }
         }
         $contact->save();
 
@@ -200,7 +220,11 @@ class AdminController extends Controller
         }
 
         return response()->json([
-            'message' => $contact->status === 'resolved' ? 'Complaint marked as resolved.' : 'Complaint updated.',
+            'message' => match ($contact->status) {
+                'resolved' => 'Complaint marked as resolved.',
+                'archived' => 'Complaint archived. Find it under Archived.',
+                default => 'Complaint updated.',
+            },
             'data' => $contact->load('user:id,name,username'),
         ]);
     }
@@ -210,7 +234,7 @@ class AdminController extends Controller
         $contact->delete();
 
         return response()->json([
-            'message' => 'Contact message archived successfully.',
+            'message' => 'Message deleted permanently.',
         ]);
     }
 }
