@@ -179,16 +179,25 @@ class AuthController extends Controller
             $suffix++;
         }
 
-        $user = User::updateOrCreate(
-            ['email' => $email],
-            [
+        $user = User::where('email', $email)->first();
+
+        if ($user) {
+            // Link Google to the existing account; keep its name, username
+            // and password so email log-in still works.
+            $user->forceFill([
+                'google_id'         => $googleId,
+                'email_verified_at' => $user->email_verified_at ?? now(),
+            ])->save();
+        } else {
+            $user = User::create([
                 'name'              => $name,
+                'email'             => $email,
                 'username'          => $username,
                 'google_id'         => $googleId,
                 'email_verified_at' => now(),
                 'password'          => Hash::make(Str::random(24)),
-            ]
-        );
+            ]);
+        }
 
         $token = $user->createToken('api')->plainTextToken;
 

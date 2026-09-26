@@ -9,21 +9,70 @@ const initialSignup = {
   password_confirmation: "",
 };
 
-function GoogleButton({ mode, onGoogleLogin, setError }) {
-  const handleGoogleLogin = async () => {
-    setError("");
-    try {
-      await onGoogleLogin();
-    } catch (err) {
-      setError(err.message || "Google sign-in failed.");
-    }
-  };
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GSI_SCRIPT_ID = "google-identity-script";
 
-  return (
-    <button type="button" className="button button--secondary" onClick={handleGoogleLogin}>
-      Continue with Google
-    </button>
-  );
+/**
+ * Google's own sign-in button (Google Identity Services). Google hands back a
+ * signed ID token, which the API verifies before logging the cook in.
+ */
+function GoogleButton({ mode, onGoogleLogin, setError }) {
+  const containerId = useId().replace(/:/g, "");
+
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return undefined;
+    let cancelled = false;
+
+    function renderButton() {
+      const container = document.getElementById(containerId);
+      if (cancelled || !container || !window.google?.accounts?.id) return;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: async (response) => {
+          setError("");
+          try {
+            await onGoogleLogin(response.credential);
+          } catch (err) {
+            setError(err.message || "Google sign-in failed.");
+          }
+        },
+      });
+      container.innerHTML = "";
+      window.google.accounts.id.renderButton(container, {
+        theme: "outline",
+        size: "large",
+        shape: "pill",
+        text: mode === "signup" ? "signup_with" : "continue_with",
+        width: Math.min(360, container.clientWidth || 320),
+      });
+    }
+
+    if (window.google?.accounts?.id) {
+      renderButton();
+    } else {
+      let script = document.getElementById(GSI_SCRIPT_ID);
+      if (!script) {
+        script = document.createElement("script");
+        script.id = GSI_SCRIPT_ID;
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.onerror = () => setError("Google sign-in could not be loaded. Check your connection and try again.");
+        document.body.appendChild(script);
+      }
+      script.addEventListener("load", renderButton, { once: true });
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [containerId, mode, onGoogleLogin, setError]);
+
+  if (!GOOGLE_CLIENT_ID) {
+    return <p className="muted auth-note">Google sign-in is not set up on this site.</p>;
+  }
+
+  return <div id={containerId} className="google-button-slot" />;
 }
 
 export default function AuthModal({
@@ -107,15 +156,6 @@ export default function AuthModal({
       setError(submitError.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleGoogleLogin() {
-    setError("");
-    try {
-      await onGoogleLogin();
-    } catch (err) {
-      setError(err.message || "Google sign-in failed.");
     }
   }
 
