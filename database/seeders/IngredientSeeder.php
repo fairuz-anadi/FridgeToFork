@@ -42,6 +42,7 @@ class IngredientSeeder extends Seeder
         ['Sweet Potato', 'produce', 86, 1.6, 20.1, 0.1, false, ['sweet potatoes']],
         ['Apple', 'produce', 52, 0.3, 13.8, 0.2, false, ['apples']],
         ['Banana', 'produce', 89, 1.1, 22.8, 0.3, false, ['bananas']],
+        ['Orange', 'produce', 47, 0.9, 11.8, 0.1, false, ['oranges', 'malta']],
         ['Mango', 'produce', 60, 0.8, 15.0, 0.4, false, ['mangoes']],
         ['Peas', 'produce', 81, 5.4, 14.5, 0.4, false, ['green peas', 'frozen peas']],
         ['Sweetcorn', 'produce', 86, 3.3, 19.0, 1.4, false, ['corn', 'sweet corn']],
