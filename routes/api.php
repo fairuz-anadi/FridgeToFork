@@ -32,7 +32,6 @@ Route::get('recipes/{recipe}', [RecipeController::class, 'show']);
 Route::get('recipe-images/{path}', [RecipeController::class, 'image'])->where('path', '.*');
 Route::get('leaderboards', [DashboardController::class, 'leaderboards']);
 Route::get('users/{user}/tips', [TipController::class, 'show']);
-Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
 
 // Ingredient-Based Search — works signed out too, using ad-hoc ingredients.
 Route::get('ingredients', [IngredientController::class, 'index']);
@@ -91,11 +90,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('shopping-list/{shoppingListItem}', [ShoppingListController::class, 'destroy']);
     Route::post('shopping-list/clear', [ShoppingListController::class, 'clear']);
 
+    // Contact Admin / complaints
+    Route::post('contact', [ContactController::class, 'store'])->middleware('throttle:5,1');
+    Route::get('contact', [ContactController::class, 'mine']);
+
     Route::middleware('admin')->group(function () {
         Route::get('admin/dashboard', [AdminController::class, 'dashboard']);
         Route::delete('admin/recipes/{recipe}', [AdminController::class, 'deleteRecipe']);
         Route::delete('admin/users/{user}', [AdminController::class, 'deleteUser']);
         Route::delete('admin/reviews/{review}', [AdminController::class, 'deleteReview']);
+        Route::get('admin/contacts', [AdminController::class, 'contacts']);
+        Route::patch('admin/contacts/{contact}', [AdminController::class, 'updateContact']);
         Route::delete('admin/contacts/{contact}', [AdminController::class, 'deleteContact']);
     });
 });

@@ -93,4 +93,9 @@ class User extends Authenticatable
             ->orderByDesc('recipes_count')
             ->orderBy('name');
     }
+
+    public function contactSubmissions()
+    {
+        return $this->hasMany(ContactSubmission::class);
+    }
 }

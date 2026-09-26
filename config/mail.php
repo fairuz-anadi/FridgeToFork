@@ -34,6 +34,12 @@ return [
     */
 
     'mailers' => [
+        // HTTPS API mailer for hosts that block SMTP (see BrevoTransport).
+        'brevo' => [
+            'transport' => 'brevo',
+            'key' => env('BREVO_API_KEY'),
+        ],
+
         'smtp' => [
             'transport' => 'smtp',
             'url' => env('MAIL_URL'),
@@ -106,6 +112,18 @@ return [
     | used globally for all e-mails that are sent by your application.
     |
     */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Complaint Inbox
+    |--------------------------------------------------------------------------
+    |
+    | Where Contact Admin messages are emailed. Falls back to the admin
+    | account's email address.
+    |
+    */
+
+    'complaints_to' => env('CONTACT_EMAIL', env('ADMIN_EMAIL')),
 
     'from' => [
         'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),

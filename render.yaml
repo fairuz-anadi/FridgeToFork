@@ -36,8 +36,20 @@ services:
           property: connectionString
       - key: LOG_CHANNEL
         value: stderr
+      # Contact Admin emails go out through Brevo's HTTPS API (Render's free
+      # plan blocks SMTP). Set BREVO_API_KEY and a Brevo-verified
+      # MAIL_FROM_ADDRESS in the dashboard; CONTACT_EMAIL receives complaints.
+      # Without a key the complaint is still saved in the admin inbox.
       - key: MAIL_MAILER
-        value: log
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_ADDRESS
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: FridgeToFork
+      - key: CONTACT_EMAIL
+        sync: false
       - key: NUTRITION_PROVIDER
         value: local
       # Optional AI for the chatbot and the fridge photo scan. Set ONE of

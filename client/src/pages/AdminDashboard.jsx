@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/api";
+import ComplaintInbox from "../components/ComplaintInbox";
 import { useToast } from "../components/useToast";
 
 function formatDate(value) {
@@ -106,7 +107,6 @@ export default function AdminDashboard() {
 
   const stats = dashboard.stats || {};
   const highlights = dashboard.highlights || {};
-  const recentContacts = dashboard.recent_contacts || [];
   const recentRecipes = dashboard.recent_recipes || [];
   const recentReviews = dashboard.recent_reviews || [];
   const hasUserDirectory = Array.isArray(dashboard.users);
@@ -125,7 +125,7 @@ export default function AdminDashboard() {
           <div className="admin-badges">
             <span className="chip">Members: {stats.members ?? stats.users ?? 0}</span>
             <span className="chip">Recipes this week: {stats.recipes_this_week ?? 0}</span>
-            <span className="chip">Contacts waiting: {stats.contacts ?? 0}</span>
+            <span className="chip">Open complaints: {stats.contacts ?? 0}</span>
           </div>
         </div>
 
@@ -213,7 +213,7 @@ export default function AdminDashboard() {
         />
         <StatCard
           active={activeTab === "contacts"}
-          hint="Contact messages awaiting review"
+          hint="Open complaints waiting for you"
           label="Contacts"
           onClick={() => setActiveTab("contacts")}
           value={stats.contacts ?? 0}
@@ -461,48 +461,7 @@ export default function AdminDashboard() {
         </section>
       )}
 
-      {activeTab === "contacts" && (
-        <section className="admin-panel">
-          <div className="section-row">
-            <div>
-              <p className="eyebrow">Inbox</p>
-              <h2>Contact messages from your community</h2>
-            </div>
-          </div>
-
-          <div className="admin-list">
-            {recentContacts.length ? (
-              recentContacts.map((submission) => (
-                <div className="admin-list-row" key={`contact-${submission.id}`}>
-                  <div>
-                    <strong>{submission.name}</strong>
-                    <p className="muted">
-                      {submission.email} · {formatDate(submission.created_at)}
-                    </p>
-                    <p>{submission.message}</p>
-                  </div>
-                  <button
-                    className="button button--ghost"
-                    disabled={busyAction === `contact-${submission.id}`}
-                    onClick={() =>
-                      requestAdminAction(
-                        `contact-${submission.id}`,
-                        () => api.adminDeleteContact(submission.id),
-                        "Archive this contact message?"
-                      )
-                    }
-                    type="button"
-                  >
-                    {busyAction === `contact-${submission.id}` ? "Archiving..." : "Archive"}
-                  </button>
-                </div>
-              ))
-            ) : (
-              <SectionEmpty>Your inbox is clear.</SectionEmpty>
-            )}
-          </div>
-        </section>
-      )}
+      {activeTab === "contacts" && <ComplaintInbox onChanged={loadDashboard} />}
     </div>
   );
 }

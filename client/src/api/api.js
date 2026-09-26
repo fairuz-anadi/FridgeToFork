@@ -222,6 +222,16 @@ export const api = {
     request(`/admin/users/${id}`, { method: "DELETE" }, { errorMessage: "We couldn't delete this user right now." }),
   adminDeleteReview: (id) =>
     request(`/admin/reviews/${id}`, { method: "DELETE" }, { errorMessage: "We couldn't delete this review right now." }),
+  myContacts: () =>
+    request("/contact", {}, { errorMessage: "We couldn't load your messages right now." }),
+  adminContacts: (status) =>
+    request(`/admin/contacts${status ? `?status=${status}` : ""}`, {}, { errorMessage: "We couldn't load the inbox right now." }),
+  adminUpdateContact: (id, body) =>
+    request(
+      `/admin/contacts/${id}`,
+      { method: "PATCH", body: JSON.stringify(body) },
+      { errorMessage: "We couldn't update this message right now." }
+    ),
   adminDeleteContact: (id) =>
     request(`/admin/contacts/${id}`, { method: "DELETE" }, { errorMessage: "We couldn't archive this message right now." }),
   sendTip: (body) =>
