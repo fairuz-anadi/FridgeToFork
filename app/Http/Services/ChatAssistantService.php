@@ -6,8 +6,10 @@ use Anthropic\Client;
 use App\Models\Ingredient;
 use App\Models\Recipe;
 use App\Models\User;
+use App\Support\AiProvider;
 use App\Support\CuisineCatalog;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -15,10 +17,11 @@ use Throwable;
 /**
  * The FridgeToFork recipe chatbot.
  *
- * When ANTHROPIC_API_KEY is set, Claude answers using tools that read the
- * recipe library, the ingredient matcher and the signed-in cook's fridge.
- * Without a key — or if the API call fails — a rule-based assistant answers
- * from the same data, so the chat always works.
+ * When an AI provider is configured (Anthropic's Claude or OpenAI — see
+ * AiProvider), the model answers using tools that read the recipe library,
+ * the ingredient matcher and the signed-in cook's fridge. Without a key — or
+ * if the API call fails — a rule-based assistant answers from the same data,
+ * so the chat always works.
  */
 class ChatAssistantService
 {
@@ -42,9 +45,13 @@ class ChatAssistantService
     {
         $this->seen = [];
 
-        if (config('services.anthropic.key')) {
+        $provider = AiProvider::current();
+
+        if ($provider) {
             try {
-                return $this->replyWithClaude($history, $user);
+                return $provider === AiProvider::OPENAI
+                    ? $this->replyWithOpenAi($history, $user)
+                    : $this->replyWithClaude($history, $user);
             } catch (Throwable $e) {
                 Log::warning('Chat assistant fell back to the built-in replies: ' . $e->getMessage());
                 $this->seen = [];
@@ -111,6 +118,70 @@ class ChatAssistantService
         }
 
         throw new \RuntimeException('Claude used too many tool rounds.');
+    }
+
+    // ------------------------------------------------------------------ OpenAI
+
+    private function replyWithOpenAi(array $history, ?User $user): array
+    {
+        set_time_limit(120);
+
+        $messages = array_merge(
+            [['role' => 'system', 'content' => $this->systemPrompt($user)]],
+            array_map(fn ($m) => ['role' => $m['role'], 'content' => $m['content']], $history),
+        );
+
+        $tools = array_map(fn (array $tool) => [
+            'type' => 'function',
+            'function' => [
+                'name' => $tool['name'],
+                'description' => $tool['description'],
+                'parameters' => $tool['inputSchema'],
+            ],
+        ], $this->toolDefinitions($user));
+
+        for ($round = 0; $round < self::MAX_TOOL_ROUNDS; $round++) {
+            $choice = Http::withToken(config('services.openai.key'))
+                ->timeout(60)
+                ->post(rtrim(config('services.openai.base_url'), '/') . '/chat/completions', [
+                    'model' => config('services.openai.model'),
+                    'messages' => $messages,
+                    'tools' => $tools,
+                    'max_completion_tokens' => 1500,
+                ])
+                ->throw()
+                ->json('choices.0');
+
+            $message = $choice['message'] ?? [];
+
+            if (!empty($message['refusal']) || ($choice['finish_reason'] ?? null) === 'content_filter') {
+                throw new \RuntimeException('OpenAI declined the request.');
+            }
+
+            if (empty($message['tool_calls'])) {
+                $text = trim((string) ($message['content'] ?? ''));
+                if ($text === '') {
+                    throw new \RuntimeException('OpenAI returned no text.');
+                }
+
+                return ['reply' => $text, 'recipes' => $this->cardsMentionedIn($text), 'mode' => 'ai'];
+            }
+
+            $messages[] = ['role' => 'assistant', 'content' => $message['content'] ?? null, 'tool_calls' => $message['tool_calls']];
+
+            foreach ($message['tool_calls'] as $call) {
+                try {
+                    $input = json_decode($call['function']['arguments'] ?? '{}', true, 512, JSON_THROW_ON_ERROR);
+                    $output = json_encode($this->runTool($call['function']['name'] ?? '', (array) $input, $user));
+                } catch (Throwable $e) {
+                    $output = json_encode(['error' => $e->getMessage()]);
+                }
+
+                $messages[] = ['role' => 'tool', 'tool_call_id' => $call['id'], 'content' => $output];
+            }
+        }
+
+        throw new \RuntimeException('OpenAI used too many tool rounds.');
     }
 
     private function systemPrompt(?User $user): string

@@ -17,7 +17,7 @@ class ChatAssistantTest extends TestCase
     {
         parent::setUp();
 
-        config(['services.anthropic.key' => null]);
+        config(['services.anthropic.key' => null, 'services.openai.key' => null]);
         $this->seed();
     }
 

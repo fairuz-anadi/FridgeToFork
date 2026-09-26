@@ -54,9 +54,21 @@ return [
     ],
 
     /*
-     | The recipe chatbot uses Claude when an API key is configured and falls
-     | back to the built-in rule-based assistant otherwise.
+     | The recipe chatbot and the fridge photo scan use an AI provider when an
+     | API key is configured: Anthropic (Claude) or OpenAI. AI_PROVIDER picks
+     | one explicitly; otherwise whichever key is set is used. Without a key
+     | the chatbot falls back to the built-in rule-based assistant.
      */
+    'ai' => [
+        'provider' => env('AI_PROVIDER'),
+    ],
+
+    'openai' => [
+        'key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+        'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
+    ],
+
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
         'model' => env('ANTHROPIC_MODEL', 'claude-opus-5'),
